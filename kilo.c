@@ -7,6 +7,9 @@
  * C coding skills in the event I ever need them
  * in the future. 
 */
+
+/*** includes ***/
+
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
@@ -14,8 +17,12 @@
 #include <termio.h>
 #include <unistd.h>
 
+/*** data ***/
+
 // stores original terminal state
 struct termios orig_termios;
+
+/*** terminal ***/
 
 /* Function: die
  * ------------------------------------------------------
@@ -60,6 +67,8 @@ void enableRawMode() {
     if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1) die("tcsetattr");
 
 }
+
+/*** init ***/
 
 int main() {
     enableRawMode();
