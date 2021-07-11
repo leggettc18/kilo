@@ -14,6 +14,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <termio.h>
 #include <unistd.h>
@@ -165,21 +166,60 @@ void editorProcessKeypress() {
     }
 }
 
+/*** append buffer ***/
+struct abuf {
+    char *b;
+    int len;
+};
+
+#define ABUF_INIT {NULL, 0}
+
+/* Function: abAppend
+** ---------------------------------------------------------
+** Appends a string to an append buffer and appropriately
+** allocates memory for it accordingly.
+**
+** ab: a pointer to an append buffer instance
+** s: a string to append to the buffer
+** len: the length of the new string
+*/
+void abAppend(struct abuf *ab, const char *s, int len) {
+    char *new = realloc(ab->b, ab->len + len);
+
+    if(new == NULL) return;
+    memcpy(&new[ab->len], s, len);
+    ab->b = new;
+    ab->len += len;
+}
+
+/* Function: abFree
+** ---------------------------------------------------------
+** The destructor for our abuf type. Frees the memory in use
+** by the given abuf
+**
+** ab: a pointer to an append buffer instance
+*/
+void abFree(struct abuf *ab) {
+    free(ab->b);
+}
+
 /*** output ***/
 
 /* Function: editorDrawRows
 ** ----------------------------------------------------------
 ** Draws a tilde on any unpopulated rows on the screen.
+**
+** ab: pointer to an abuf instance.
 */
-void editorDrawRows()
+void editorDrawRows(struct abuf *ab)
 {
     int y;
     for (y = 0; y < E.screenrows; y++)
     {
-        write(STDOUT_FILENO, "~", 1);
+        abAppend(ab, "~", 1);
 
         if(y < E.screenrows - 1) {
-            write(STDOUT_FILENO, "\r\n", 2);
+            abAppend(ab, "\r\n", 2);
         }
     }
 }
@@ -189,10 +229,13 @@ void editorDrawRows()
 ** Refreshes the screen with the editor's output
 */
 void editorRefreshScreen() {
-    write(STDOUT_FILENO, "\x1b[2J", 4);
-    write(STDOUT_FILENO, "\x1b[H", 3);
-    editorDrawRows();
-    write(STDOUT_FILENO, "\x1b[H", 3);
+    struct abuf ab = ABUF_INIT;
+    abAppend(&ab, "\x1b[2J", 4);
+    abAppend(&ab, "\x1b[H", 3);
+    editorDrawRows(&ab);
+    abAppend(&ab, "\x1b[H", 3);
+    write(STDOUT_FILENO, ab.b, ab.len);
+    abFree(&ab);
 }
 
 /*** init ***/
