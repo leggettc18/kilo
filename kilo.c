@@ -8,6 +8,7 @@
  * in the future. 
 */
 #include <ctype.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <termio.h>
@@ -16,12 +17,24 @@
 // stores original terminal state
 struct termios orig_termios;
 
+/* Function: die
+ * ------------------------------------------------------
+ * Prints an error and kills the program
+ * 
+ * *s: pointer to the error message to print
+*/
+void die(const char *s) {
+    perror(s);
+    exit(1);
+}
+
 /* Function: disableRawMode
  * ------------------------------------------------------
  * Disables the raw mode by restoring the original state
  */
 void disableRawMode() {
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+    if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios) == -1)
+        die("tcsetattr");
 }
 
 /* Function: enableRawMode
@@ -31,7 +44,7 @@ void disableRawMode() {
  */
 void enableRawMode() {
     // gets the original terminal state.
-    tcgetattr(STDIN_FILENO, &orig_termios);
+    if(tcgetattr(STDIN_FILENO, &orig_termios) == -1) die("tcgetattr");
     // sets up restoration of that state on exit.
     atexit(disableRawMode);
 
@@ -43,7 +56,8 @@ void enableRawMode() {
     raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
     raw.c_cc[VMIN] = 0;
     raw.c_cc[VTIME] = 1;
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+
+    if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1) die("tcsetattr");
 
 }
 
@@ -51,7 +65,7 @@ int main() {
     enableRawMode();
     while (1) {
         char c = '\0';
-        read(STDIN_FILENO, &c, 1);
+        if(read(STDIN_FILENO, &c, 1) == -1 && errno != EAGAIN) die("read");
         if(iscntrl(c)) {
             printf("%d\r\n", c);
         } else {
