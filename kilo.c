@@ -56,7 +56,7 @@ struct editorConfig
     int screenrows;
     int screencols;
     int numrows;
-    erow row;
+    erow *row;
     // stores original terminal state
     struct termios orig_termios;
 };
@@ -205,13 +205,13 @@ int editorReadKey()
 }
 
 /* Function: getCursorPosition
-** ---------------------------------------------------------
-** Gets the current cursor position on the screen.
-**
-** *rows and *cols: pointers to variables to store the row
-** and column that the cursor is currently positioned at.
-**
-** returns: a status code indicating success (0) or failure (non-zero)
+ * ---------------------------------------------------------
+ * Gets the current cursor position on the screen.
+ *
+ * *rows and *cols: pointers to variables to store the row
+ * and column that the cursor is currently positioned at.
+ *
+ * returns: a status code indicating success (0) or failure (non-zero)
 */
 int getCursorPosition(int *rows, int *cols)
 {
@@ -240,13 +240,13 @@ int getCursorPosition(int *rows, int *cols)
 }
 
 /* Function: getWindowSize
-** ---------------------------------------------------------
-** Simply enough, returns the window size of the terminal.
-**
-** *rows and *cols: pointers to variables that will store the
-** number of row and columns.
-**
-** returns: a status code indicating success (0) or failure (non-zero)
+ * ---------------------------------------------------------
+ * Simply enough, returns the window size of the terminal.
+ *
+ * *rows and *cols: pointers to variables that will store the
+ * number of row and columns.
+ *
+ * returns: a status code indicating success (0) or failure (non-zero)
 */
 int getWindowSize(int *rows, int *cols)
 {
@@ -266,13 +266,42 @@ int getWindowSize(int *rows, int *cols)
     }
 }
 
+/*** row operations ***/
+
+/*  Function: editorAppendRow
+ * -----------------------------------------------------------
+ * Appends a row to the end of the editor's buffer, allocating
+ * memory accordingly.
+ * 
+ * s: string contents of the row to append.
+ * len: the length of the string to append.
+*/
+void editorAppendRow(char *s, size_t len)
+{
+    // adds an additional row to the array of rows
+    E.row = realloc(E.row, sizeof(erow) * (E.numrows + 1));
+
+    // gets index of the new row
+    int at = E.numrows;
+    // sets the size of the new row
+    E.row[at].size = len;
+    // allocates memory for the new row's string
+    E.row[at].chars = malloc(len + 1);
+    // copies the string into the new row
+    memcpy(E.row[at].chars, s, len);
+    // adds the null terminator string
+    E.row[at].chars[len] = '\0';
+    // increases the numrows counter
+    E.numrows++;
+}
+
 /*** file i/o ***/
 
 /* Function: editorOpen
-** -------------------------------------------------------
-** Opens a file into the text edtior buffer.
-**
-** filename: string representing the name or path to a file.
+ * -------------------------------------------------------
+ * Opens a file into the text edtior buffer.
+ *
+ * filename: string representing the name or path to a file.
 */
 void editorOpen(char *filename)
 {
@@ -283,17 +312,12 @@ void editorOpen(char *filename)
     char *line = NULL;
     size_t linecap = 0;
     ssize_t linelen;
-    linelen = getline(&line, &linecap, fp);
-    if (linelen != -1)
+    while ((linelen = getline(&line, &linecap, fp)) != -1)
     {
-        while (linelen > 0 && (line[linelen - 1] == '\n' || 
+        while (linelen > 0 && (line[linelen - 1] == '\n' ||
                                line[linelen - 1] == '\r'))
             linelen--;
-    E.row.size = linelen;
-    E.row.chars = malloc(linelen + 1);
-    memcpy(E.row.chars, line, linelen);
-    E.row.chars[linelen] = '\0';
-    E.numrows = 1;
+        editorAppendRow(line, linelen);
     }
     free(line);
     fclose(fp);
@@ -302,11 +326,11 @@ void editorOpen(char *filename)
 /*** input ***/
 
 /* Function: editorMoveCursor
-** -----------------------------------------------------
-** Changes the cursor position in the global editor state
-** according to the provided key
-**
-** key: a character representing a key that was pressed.
+ * -----------------------------------------------------
+ * Changes the cursor position in the global editor state
+ * according to the provided key
+ *
+ * key: a character representing a key that was pressed.
 */
 void editorMoveCursor(int key)
 {
@@ -340,8 +364,8 @@ void editorMoveCursor(int key)
 }
 
 /* Function: editorProcessKeypress
-** -----------------------------------------------------
-** Reads a keypress and performs an editor function accordingly
+ * -----------------------------------------------------
+ * Reads a keypress and performs an editor function accordingly
 */
 void editorProcessKeypress()
 {
@@ -393,13 +417,13 @@ struct abuf
     }
 
 /* Function: abAppend
-** ---------------------------------------------------------
-** Appends a string to an append buffer and appropriately
-** allocates memory for it accordingly.
-**
-** ab: a pointer to an append buffer instance
-** s: a string to append to the buffer
-** len: the length of the new string
+ * ---------------------------------------------------------
+ * Appends a string to an append buffer and appropriately
+ * allocates memory for it accordingly.
+ *
+ * ab: a pointer to an append buffer instance
+ * s: a string to append to the buffer
+ * len: the length of the new string
 */
 void abAppend(struct abuf *ab, const char *s, int len)
 {
@@ -413,11 +437,11 @@ void abAppend(struct abuf *ab, const char *s, int len)
 }
 
 /* Function: abFree
-** ---------------------------------------------------------
-** The destructor for our abuf type. Frees the memory in use
-** by the given abuf
-**
-** ab: a pointer to an append buffer instance
+ * ---------------------------------------------------------
+ * The destructor for our abuf type. Frees the memory in use
+ * by the given abuf
+ *
+ * ab: a pointer to an append buffer instance
 */
 void abFree(struct abuf *ab)
 {
@@ -427,10 +451,10 @@ void abFree(struct abuf *ab)
 /*** output ***/
 
 /* Function: editorDrawRows
-** ----------------------------------------------------------
-** Draws a tilde on any unpopulated rows on the screen.
-**
-** ab: pointer to an abuf instance.
+ * ----------------------------------------------------------
+ * Draws a tilde on any unpopulated rows on the screen.
+ *
+ * ab: pointer to an abuf instance.
 */
 void editorDrawRows(struct abuf *ab)
 {
@@ -462,10 +486,10 @@ void editorDrawRows(struct abuf *ab)
         }
         else
         {
-            int len = E.row.size;
+            int len = E.row[y].size;
             if (len > E.screencols)
                 len = E.screencols;
-            abAppend(ab, E.row.chars, len);
+            abAppend(ab, E.row[y].chars, len);
         }
         abAppend(ab, "\x1b[K", 3);
 
@@ -477,8 +501,8 @@ void editorDrawRows(struct abuf *ab)
 }
 
 /* Function: editorRefreshScreen
-** ----------------------------------------------------------
-** Refreshes the screen with the editor's output
+ * ----------------------------------------------------------
+ * Refreshes the screen with the editor's output
 */
 void editorRefreshScreen()
 {
@@ -502,15 +526,16 @@ void editorRefreshScreen()
 /*** init ***/
 
 /* Function: initEditor
-** ----------------------------------------------------
-** Initializes the global editor state with things like
-** the screen size
+ * ----------------------------------------------------
+ * Initializes the global editor state with things like
+ * the screen size
 */
 void initEditor()
 {
     E.cx = 0;
     E.cy = 0;
     E.numrows = 0;
+    E.row = NULL;
 
     if (getWindowSize(&E.screenrows, &E.screencols) == -1)
         die("getWindowSize");
@@ -520,7 +545,8 @@ int main(int argc, char *argv[])
 {
     enableRawMode();
     initEditor();
-    if (argc >= 2) {
+    if (argc >= 2)
+    {
         editorOpen(argv[1]);
     }
 
