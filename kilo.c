@@ -34,6 +34,7 @@
 
 enum editorKey
 {
+    BACKSPACE = 127,
     ARROW_LEFT = 1000,
     ARROW_RIGHT,
     ARROW_DOWN,
@@ -350,6 +351,39 @@ void editorAppendRow(char *s, size_t len)
     E.numrows++;
 }
 
+/* Function: editorRowInsertChar
+ * ----------------------------------------------------------------------
+ * Inserts a character at the given position of the given row
+ * 
+ * row: pointer to erow instance
+ * at: position in the row to insert the character
+ * c: character to insert (in the form of an integer)
+*/
+void editorRowInsertChar(erow *row, int at, int c) {
+    if (at < 0 || at > row->size) at = row->size;
+    row->chars = realloc(row->chars, row->size + 2);
+    memmove(&row->chars[at + 1], &row->chars[at], row->size - at + 1);
+    row->size++;
+    row->chars[at] = c;
+    editorUpdateRow(row);
+}
+
+/*** editor operations ***/
+
+/* Function: editorInsertChar
+ * ----------------------------------------------------------------------
+ * Inserts the given character at the cursor location
+ * 
+ * c: the int code of the character to insert.
+*/
+void editorInsertChar(int c) {
+    if (E.cy == E.numrows) {
+        editorAppendRow("", 0);
+    }
+    editorRowInsertChar(&E.row[E.cy], E.cx, c);
+    E.cx++;
+}
+
 /*** file i/o ***/
 
 /* Function: editorOpen
@@ -444,6 +478,9 @@ void editorProcessKeypress()
 
     switch (c)
     {
+    case '\r':
+        /*TODO*/
+        break;
     case CTRL_KEY('q'):
         write(STDOUT_FILENO, "\x1b[2J", 4);
         write(STDOUT_FILENO, "\x1b[H", 3);
@@ -455,6 +492,11 @@ void editorProcessKeypress()
     case END_KEY:
         if (E.cy < E.numrows)
             E.cx = E.row[E.cy].size;
+        break;
+    case BACKSPACE:
+    case CTRL_KEY('h'):
+    case DEL_KEY:
+        /*TODO*/
         break;
     case PAGE_UP:
     case PAGE_DOWN:
@@ -478,6 +520,12 @@ void editorProcessKeypress()
     case ARROW_LEFT:
     case ARROW_RIGHT:
         editorMoveCursor(c);
+        break;
+    case CTRL_KEY('l'):
+    case '\x1b':
+        break;
+    default:
+        editorInsertChar(c);
         break;
     }
 }
