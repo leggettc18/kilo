@@ -109,12 +109,27 @@ void editorProcessKeypress() {
 
 /*** output ***/
 
+/* Function: editorDrawRows
+** ----------------------------------------------------------
+** Draws a tilde on any unpopulated rows on the screen.
+*/
+void editorDrawRows()
+{
+    int y;
+    for (y = 0; y < 24; y++)
+    {
+        write(STDOUT_FILENO, "~\r\n", 3);
+    }
+}
+
 /* Function: editorRefreshScreen
 ** ----------------------------------------------------------
 ** Refreshes the screen with the editor's output
 */
 void editorRefreshScreen() {
     write(STDOUT_FILENO, "\x1b[2J", 4);
+    write(STDOUT_FILENO, "\x1b[H", 3);
+    editorDrawRows();
     write(STDOUT_FILENO, "\x1b[H", 3);
 }
 
