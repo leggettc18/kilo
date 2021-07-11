@@ -17,6 +17,10 @@
 #include <termio.h>
 #include <unistd.h>
 
+/*** defines ***/
+
+#define CTRL_KEY(k) ((k) & 0x1f)
+
 /*** data ***/
 
 // stores original terminal state
@@ -81,7 +85,7 @@ int main() {
             printf("%d ('%c')\r\n", c, c);
         }
 
-        if(c == 'q') break;
+        if(c == CTRL_KEY('q')) break;
     }
 
     return 0;
