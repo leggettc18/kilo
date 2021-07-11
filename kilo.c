@@ -14,6 +14,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
 #include <termio.h>
 #include <unistd.h>
 
@@ -23,8 +24,14 @@
 
 /*** data ***/
 
-// stores original terminal state
-struct termios orig_termios;
+struct editorConfig{
+    int screenrows;
+    int screencols;
+    // stores original terminal state
+    struct termios orig_termios;
+};
+
+struct editorConfig E;
 
 /*** terminal ***/
 
@@ -46,7 +53,7 @@ void die(const char *s) {
  * Disables the raw mode by restoring the original state
  */
 void disableRawMode() {
-    if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios) == -1)
+    if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &E.orig_termios) == -1)
         die("tcsetattr");
 }
 
@@ -57,12 +64,12 @@ void disableRawMode() {
  */
 void enableRawMode() {
     // gets the original terminal state.
-    if(tcgetattr(STDIN_FILENO, &orig_termios) == -1) die("tcgetattr");
+    if(tcgetattr(STDIN_FILENO, &E.orig_termios) == -1) die("tcgetattr");
     // sets up restoration of that state on exit.
     atexit(disableRawMode);
 
     // sets necessary flags to enable raw mode.
-    struct termios raw = orig_termios;
+    struct termios raw = E.orig_termios;
     raw.c_iflag &= ~(BRKINT | INPCK | ISTRIP | IXON | ICRNL);
     raw.c_oflag &= ~(OPOST);
     raw.c_cflag |= (CS8);
@@ -88,6 +95,28 @@ char editorReadKey() {
     }
     return c;
 }
+
+/* Function: getWindowSize
+** ---------------------------------------------------------
+** Simply enough, returns the window size of the terminal.
+**
+** *rows and *cols: pointers to variables that will store the
+** number of row and columns.
+**
+** returns: a status code indicating success (0) or failure (non-zero)
+*/
+int getWindowSize(int *rows, int *cols) {
+    struct winsize ws;
+
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
+        return -1;
+    } else {
+        *cols = ws.ws_col;
+        *rows = ws.ws_row;
+        return 0;
+    }
+}
+
 
 /*** input ***/
 
@@ -116,7 +145,7 @@ void editorProcessKeypress() {
 void editorDrawRows()
 {
     int y;
-    for (y = 0; y < 24; y++)
+    for (y = 0; y < E.screenrows; y++)
     {
         write(STDOUT_FILENO, "~\r\n", 3);
     }
@@ -135,8 +164,18 @@ void editorRefreshScreen() {
 
 /*** init ***/
 
+/* Function: initEditor
+** ----------------------------------------------------
+** Initializes the global editor state with things like
+** the screen size
+*/
+void initEditor() {
+    if(getWindowSize(&E.screenrows, &E.screencols) == -1) die("getWindowSize");
+}
+
 int main() {
     enableRawMode();
+    initEditor();
     while (1) {
         editorRefreshScreen();
         editorProcessKeypress();
