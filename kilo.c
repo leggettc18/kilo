@@ -38,6 +38,7 @@ void enableRawMode() {
     // sets necessary flags to enable raw mode.
     struct termios raw = orig_termios;
     raw.c_iflag &= ~(IXON | ICRNL);
+    raw.c_oflag &= ~(OPOST);
     raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 
