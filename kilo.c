@@ -336,21 +336,23 @@ void editorUpdateRow(erow *row)
     row->rsize = idx;
 }
 
-/*  Function: editorAppendRow
+/*  Function: editorInsertRow
  * -----------------------------------------------------------
- * Appends a row to the end of the editor's buffer, allocating
+ * Appends a row at the given index of the editor's buffer, allocating
  * memory accordingly.
  * 
+ * at: position in the buffer to insert the row.
  * s: string contents of the row to append.
  * len: the length of the string to append.
 */
-void editorAppendRow(char *s, size_t len)
+void editorInsertRow(int at, char *s, size_t len)
 {
+    if (at < 0 || at > E.numrows) return;
+
     // adds an additional row to the array of rows
     E.row = realloc(E.row, sizeof(erow) * (E.numrows + 1));
-
-    // gets index of the new row
-    int at = E.numrows;
+    // Moves data down one row
+    memmove(&E.row[at + 1], &E.row[at], sizeof(erow) * (E.numrows - at));
     // sets the size of the new row
     E.row[at].size = len;
     // allocates memory for the new row's string
@@ -469,10 +471,32 @@ void editorInsertChar(int c)
 {
     if (E.cy == E.numrows)
     {
-        editorAppendRow("", 0);
+        editorInsertRow(E.numrows, "", 0);
     }
     editorRowInsertChar(&E.row[E.cy], E.cx, c);
     E.cx++;
+}
+
+void editorInsertNewLine() {
+    if (E.cx == 0) {
+        editorInsertRow(E.cy, "", 0);
+    } else {
+        // Get the current row
+        erow *row = &E.row[E.cy];
+        // Inserts a row after the current one, and moves the chars after the cursor to that row.
+        editorInsertRow(E.cy + 1, &row->chars[E.cx], row->size - E.cx);
+        // gets the current row instance again
+        row = &E.row[E.cy];
+        // Sets the size to where the cursor was horizontally
+        row->size = E.cx;
+        // truncates the current row's string by placing a null terminator directly after where the remaining chars were copied to the next row earlier
+        row->chars[row->size] = '\0';
+        // visually update the row.
+        editorUpdateRow(row);
+    }
+    // Moves cursor to the beginning of the new row.
+    E.cy++;
+    E.cx = 0;
 }
 
 /* Function: editorDelChar
@@ -553,7 +577,7 @@ void editorOpen(char *filename)
         while (linelen > 0 && (line[linelen - 1] == '\n' ||
                                line[linelen - 1] == '\r'))
             linelen--;
-        editorAppendRow(line, linelen);
+        editorInsertRow(E.numrows, line, linelen);
     }
     free(line);
     fclose(fp);
@@ -664,7 +688,7 @@ void editorProcessKeypress()
     switch (c)
     {
     case '\r':
-        /*TODO*/
+        editorInsertNewLine();
         break;
     case CTRL_KEY('q'):
         if (E.dirty && quit_times > 0) {
