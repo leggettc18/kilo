@@ -289,6 +289,17 @@ int getWindowSize(int *rows, int *cols)
 
 /*** row operations ***/
 
+/* Function editorRowCxToRx
+ * -----------------------------------------------------------------
+ * Translates from the cursor position to the render position. Useful for
+ * things like tabstops that visually take up more characters than their
+ * data in the row's string variable does.
+ * 
+ * row: pointer to the erow instance.
+ * cx: the cursor position you wish to translate
+ * 
+ * returns: the cursor's position in the rendered string
+*/
 int editorRowCxToRx(erow *row, int cx)
 {
     int rx = 0;
@@ -479,6 +490,11 @@ void editorInsertChar(int c)
     E.cx++;
 }
 
+/* Function: editorInsertNewLine
+ * -----------------------------------------------------------------------------
+ * Inserts a new line after the current line and moves the characters to the
+ * right of the cursor to said new line.
+*/
 void editorInsertNewLine() {
     if (E.cx == 0) {
         editorInsertRow(E.cy, "", 0);
@@ -935,6 +951,11 @@ void editorDrawRows(struct abuf *ab)
     }
 }
 
+/* Function editorDrawStatusBar
+ * Draws a status bar to the bottom of the editor screen
+ *
+ * ab: pointer to the abuf instance to add the status bar to.
+*/
 void editorDrawStatusBar(struct abuf *ab)
 {
     abAppend(ab, "\x1b[7m", 4);
@@ -964,6 +985,13 @@ void editorDrawStatusBar(struct abuf *ab)
     abAppend(ab, "\r\n", 2);
 }
 
+/* Function: editorDrawMessageBar
+ * ---------------------------------------------------------------
+ * Draw the message bar at the bottom of the editor screen, below the
+ * status bar.
+ * 
+ * ab: pointer to the abuf instance to draw the message bar on.
+*/
 void editorDrawMessageBar(struct abuf *ab)
 {
     abAppend(ab, "\x1b[K", 3);
