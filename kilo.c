@@ -369,6 +369,36 @@ void editorAppendRow(char *s, size_t len)
     E.dirty++;
 }
 
+/* Function: editorFreeRow
+ * ------------------------------------------------------------
+ * Frees an erow instance's internal data from memory
+ * 
+ * row: pointer to an erow instance.
+*/
+void editorFreeRow(erow *row) {
+    free(row->render);
+    free(row->chars);
+}
+
+/* Function: editorDelRow
+ * -------------------------------------------------------------
+ * Deletes a row from the editor buffer
+ * 
+ * at: the index of the row to delete from the row array.
+*/
+void editorDelRow(int at) {
+    // Return if index is not valid
+    if (at < 0 || at >= E.numrows) return;
+    // Free the row's data from memory
+    editorFreeRow(&E.row[at]);
+    // Overwrites the row with the remaining rows' data.
+    memmove(&E.row[at], &E.row[at + 1], sizeof(erow) * (E.numrows - at - 1));
+    // Decrement the number of rows
+    E.numrows--;
+    // Set modified state.
+    E.dirty++;
+}
+
 /* Function: editorRowInsertChar
  * ----------------------------------------------------------------------
  * Inserts a character at the given position of the given row
@@ -386,6 +416,29 @@ void editorRowInsertChar(erow *row, int at, int c)
     row->size++;
     row->chars[at] = c;
     editorUpdateRow(row);
+    E.dirty++;
+}
+
+/* Functin: editorRowAppendString
+ * ------------------------------------------------------------------
+ * Appends a string to an existing row (i.e. when deleting the next row)
+ * 
+ * row: pointer to the row you are appending to.
+ * s: the string to append.
+ * len: the length of the string to append.
+*/
+void editorRowAppendString(erow *row, char *s, size_t len) {
+    // Allocates more space for the string to append
+    row->chars = realloc(row->chars, row->size + len + 1);
+    // Copies string to end of existing string
+    memcpy(&row->chars[row->size], s, len);
+    // Updates the row size
+    row->size += len;
+    // Appends the null terminator
+    row->chars[row->size] = '\0';
+    // Updates the row visually
+    editorUpdateRow(row);
+    // Sets modified state.
     E.dirty++;
 }
 
@@ -428,10 +481,21 @@ void editorInsertChar(int c)
 */
 void editorDelChar() {
     if (E.cy == E.numrows) return;
+    if (E.cx == 0 && E.cy == 0) return;
+
     erow *row = &E.row[E.cy];
     if (E.cx > 0) {
         editorRowDelChar(row, E.cx - 1);
         E.cx--;
+    } else {
+        // Move the cursor to the end of the previous line (except down one row)
+        E.cx = E.row[E.cy - 1].size;
+        // Append the current row's string to hte previous row
+        editorRowAppendString(&E.row[E.cy - 1], row->chars, row->size);
+        // Delete the current row
+        editorDelRow(E.cy);
+        // Move the cursor up to the previous row.
+        E.cy--;
     }
 }
 
